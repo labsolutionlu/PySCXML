@@ -41,14 +41,14 @@ class RegressionTest(unittest.TestCase):
                                "internal_parallel.xml", "xpath_basic.xml"]
 #        logging.basicConfig(level=logging.NOTSET)
         for name in runToCompletionList:
-            print "Running " + name 
+            print("Running " + name) 
             sm = StateMachine(name)
             sm.start()
-            self.assert_(sm.isFinished())
+            self.assertTrue(sm.isFinished())
         
         sm = StateMachine("factorial.xml")
         sm.start()
-        self.assertEquals(sm.datamodel['fac'], 720)
+        self.assertEqual(sm.datamodel['fac'], 720)
 
         with StateMachine("all_configs.xml") as sm: 
             sm.send("a")
@@ -59,7 +59,7 @@ class RegressionTest(unittest.TestCase):
             sm.send("f")
             sm.send("g")
             sm.send("h")
-            self.assert_(sm.isFinished())
+            self.assertTrue(sm.isFinished())
         
         # I think this test is obsolete because of the exit in a parallel block
 #        sm = StateMachine(open(xmlDir + "issue_626.xml").read())
@@ -99,7 +99,7 @@ class RegressionTest(unittest.TestCase):
         
         ms = MultiSession(init_sessions={"session1" : listener, "session2" : sender})
         ms.start()
-        self.assert_(all(map(lambda x: x.isFinished(), ms)))
+        self.assertTrue(all([x.isFinished() for x in ms]))
         
 
 
@@ -110,13 +110,13 @@ class RegressionTest(unittest.TestCase):
 
         filelist = [f for f in glob.glob(os.environ["PYSCXMLPATH"] + "/*xml") if "sub" not in f] 
                     
-        print "Running W3C python tests..."
+        print("Running W3C python tests...")
         
         failed = parallelize(filelist)
 #        failed = []
 #        sequentialize(filelist)   
         
-        print "completed %s w3c python tests" % len(filelist)
+        print("completed %s w3c python tests" % len(filelist))
         if failed:
             self.fail("Failed tests:\n" + "\n".join(failed))
             
@@ -126,22 +126,22 @@ class RegressionTest(unittest.TestCase):
         os.environ["PYSCXMLPATH"] = "../../w3c_tests/assertions_ecmascript/"
         
         filelist = [f for f in glob.glob(os.environ["PYSCXMLPATH"] + "/*xml") if "sub" not in f]
-        print "Running W3C ecmascript tests..."
+        print("Running W3C ecmascript tests...")
         
         failed = parallelize(filelist)
 #        failed = []
 #        sequentialize(filelist)
         
-        print "completed %s w3c ecmascript tests" % len(filelist)
+        print("completed %s w3c ecmascript tests" % len(filelist))
         if failed:
             self.fail("Failed tests:\n" + "\n".join(failed))
         
     def testW3cXpath(self):
         os.environ["PYSCXMLPATH"] = "../../w3c_tests/assertions_xpath/"
         filelist = [f for f in glob.glob(os.environ["PYSCXMLPATH"] + "/*xml") if "sub" not in f]
-        print "Running W3C xpath tests..."
+        print("Running W3C xpath tests...")
         failed = parallelize(filelist)
-        print "completed %s w3c xpath tests" % len(filelist)
+        print("completed %s w3c xpath tests" % len(filelist))
         if failed:
             self.fail(("%d failed tests:\n" % len(failed)) + "\n".join(failed))
         
@@ -180,8 +180,8 @@ def runtest(doc_uri):
         didPass = True
     except eventlet.timeout.Timeout:
         didPass = False
-    except Exception, e:
-        print doc_uri, "caught ", str(e)
+    except Exception as e:
+        print(doc_uri, "caught ", str(e))
         traceback.print_exc()
         didPass = True
     return (os.path.basename(doc_uri), didPass)
@@ -189,8 +189,8 @@ def runtest(doc_uri):
 def sequentialize(filelist):
     
     for file in filelist:
-        print file
-        print runtest(file)
+        print(file)
+        print(runtest(file))
         
 def parallelize(filelist, onSuccess=lambda x:None, onFail=lambda x:None):
     failed = []

@@ -44,7 +44,7 @@ class TestServer(PySCXMLServer):
             self.onFail(filename)
         
         if len(self.passed + self.failed) == self.n_sessions:
-            print "all done!", os.path.join(sender.filedir, sender.filename)
+            print("all done!", os.path.join(sender.filedir, sender.filename))
             raise KeyboardInterrupt()
         
         
@@ -118,11 +118,11 @@ if __name__ == '__main__':
                 fn not in stoplist + supposed_to_fail + run_on_server]
     
     def onSuccess(url):
-        print "passed:", url
+        print("passed:", url)
         move(url, "passed/")
         
     def onFail(url):
-        print "failed:", url
+        print("failed:", url)
         move(url, "failed/")
     
     pyscxmlTest.parallelize(filelist, onSuccess, onFail)

@@ -8,7 +8,7 @@ import sys
 import unittest
 
 import coverage
-import pyscxmlTest
+from . import pyscxmlTest
 import os, time
 
 

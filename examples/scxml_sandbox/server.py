@@ -46,15 +46,15 @@ def main(address):
 
     
     def eventletHandler(environ, start_response):
-        pathlist = filter(bool, environ["PATH_INFO"].split("/"))
+        pathlist = list(filter(bool, environ["PATH_INFO"].split("/")))
         session = pathlist[0]
         
         if session == "info":
             headers = {"Content-Type" : "text/plain"}
-            start_response("200 OK", headers.items())
+            start_response("200 OK", list(headers.items()))
             output = ["Things seem to be running smoothly. There are currently %s document(s) running." % len(list(pyscxml.sm_mapping)),
                       "Session\t\tConfiguration\t\tisFinished"]
-            for sessionid, sm in pyscxml.sm_mapping.items():
+            for sessionid, sm in list(pyscxml.sm_mapping.items()):
                 output.append("%s\t\t%s\t\t%s" % (sessionid, "{" + ", ".join([s.id for s in sm.interpreter.configuration if s.id != "__main__"]) + "}", sm.isFinished()))
             return ["\n".join(output)]
         
