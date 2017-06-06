@@ -31,5 +31,6 @@ setup(name="pyscxml",
           'Topic :: Text Processing :: Markup :: XML'
           
       ],
-      install_requires=['Louie', 'eventlet', 'suds', 'restlib', "lxml"]
+      install_requires=['eventlet', 'suds-py3', 'restlib', "lxml"],
+      #dependency_links=['https://github.com/labsolutionlu/louie/py3']
      )
