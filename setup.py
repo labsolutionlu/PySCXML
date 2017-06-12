@@ -1,8 +1,8 @@
 
 from setuptools import setup
 
-version = "0.8.3"
-filename = "0.8.3-20120108"
+version = "0.0.1"
+filename = "0.0.1" # labsolution, taken from trunk
 
 setup(name="pyscxml",
       version=filename,
@@ -31,6 +31,6 @@ setup(name="pyscxml",
           'Topic :: Text Processing :: Markup :: XML'
           
       ],
-      install_requires=['eventlet', 'suds-py3', 'restlib', "lxml"],
+      install_requires=[],
       #dependency_links=['https://github.com/labsolutionlu/louie/py3']
      )

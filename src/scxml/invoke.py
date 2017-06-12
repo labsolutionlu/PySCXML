@@ -14,6 +14,10 @@ This file is part of pyscxml.
     You should have received a copy of the GNU Lesser General Public License
     along with pyscxml.  If not, see <http://www.gnu.org/licenses/>.
     
+    This is an implementation of the interpreter algorithm described in the W3C standard document, 
+    which can be found at:
+    
+    http://www.w3.org/TR/2009/WD-scxml-20091029/ 
     
     @author Johan Roxendal
     @contact: johan@roxendal.com
@@ -23,26 +27,21 @@ from .messaging import exec_async
 from functools import partial
 from scxml.messaging import UrlGetter
 import logging
-import eventlet
-from scxml.interpreter import CancelEvent
+from threading import Thread
+
 
 class InvokeWrapper(object):
     
-    def __init__(self):
-        self.logger = logging.getLogger("pyscxml.invoke.%s" % type(self).__name__)
+    def __init__(self, id):
         self.invoke = lambda: None
-        self.invokeid = None
-        self.cancel = lambda: None
+        self.invokeid = id
         self.invoke_obj = None
-        self.autoforward = False
         
     def set_invoke(self, inv):
-        inv.logger = self.logger
         self.invoke_obj = inv
-        self.invokeid = inv.invokeid
-        inv.autoforward = self.autoforward 
+        inv.invokeid = self.invokeid
+        self.autoforward = inv.autoforward
         self.cancel = inv.cancel
-        self.send = getattr(inv, "send", None)
         
     def finalize(self):
         if self.invoke_obj:
@@ -51,12 +50,13 @@ class InvokeWrapper(object):
 class BaseInvoke(object):
     def __init__(self):
         self.invokeid = None
-        self.parentSessionid = None
         self.autoforward = False
-        self.src = None
+        self.content = None
         self.finalize = lambda:None
         
+        
     def start(self, parentQueue):
+#        dispatcher.send("init.invoke." + self.invokeid, self)
         pass
     
     def cancel(self):
@@ -64,92 +64,25 @@ class BaseInvoke(object):
          
     def __str__(self):
         return '<Invoke id="%s">' % self.invokeid
+    
 
-class BaseFetchingInvoke(BaseInvoke):
+class InvokeSCXML(BaseInvoke):
     def __init__(self):
         BaseInvoke.__init__(self)
-        self.getter = UrlGetter()
-        
-        dispatcher.connect(self.onHttpResult, UrlGetter.HTTP_RESULT, self.getter)
-        dispatcher.connect(self.onFetchError, UrlGetter.HTTP_ERROR, self.getter)
-        dispatcher.connect(self.onFetchError, UrlGetter.URL_ERROR, self.getter)
-        
-    def onFetchError(self, signal, exception, **named ):
-        self.logger.error(str(exception))
-        dispatcher.send("error.communication.invoke." + self.invokeid, self, data=exception)
-
-    def onHttpResult(self, signal, result, **named):
-        self.logger.debug("onHttpResult " + str(named))
-        dispatcher.send("result.invoke.%s" % (self.invokeid), self, data=result)
-    
-
-class InvokeSCXML(BaseFetchingInvoke):
-    def __init__(self, data):
-        BaseFetchingInvoke.__init__(self)
         self.sm = None
-        self.parentQueue = None
-        self.content = None
-        self.initData = data
-        self.cancelled = False
-        self.default_datamodel = "python"
-    
-    def start(self, parentId):
-        self.parentId = parentId
-        if self.src:
-            self.getter.get_async(self.src, None)
-        else:
-            self._start(self.content)
-    
-    def _start(self, doc):
-        if self.cancelled: return
-        from scxml.pyscxml import StateMachine
+        self.send = None
         
-        self.sm = StateMachine(doc, 
-                               sessionid=self.parentSessionid + "." + self.invokeid, 
-                               default_datamodel=self.default_datamodel,
-                               log_function=lambda label, val: dispatcher.send(signal="invoke_log", sender=self, label=label, msg=val),
-                               setup_session=False)
-        self.interpreter = self.sm.interpreter
-        self.sm.compiler.initData = self.initData
-        self.sm.compiler.parentId = self.parentId
-        self.sm.interpreter.parentId = self.parentId
-        dispatcher.send("created", sender=self, sm=self.sm)
-        self.sm._start_invoke(self.invokeid)
-        eventlet.spawn(self.sm.interpreter.mainEventLoop)
-
-    
-    def send(self, eventobj):
-        if self.sm and not self.sm.isFinished():
-            self.sm.interpreter.externalQueue.put(eventobj)
-    
-    def onHttpResult(self, signal, result, **named):
-        self.logger.debug("onHttpResult " + str(named))
-        self._start(result)
-        
-    def cancel(self):
-        self.cancelled = True
-        if not self.sm: return;
-        self.sm.interpreter.cancelled = True
-#        self.sm.interpreter.running = False
-#        self.sm._send(["cancel", "invoke", self.invokeid], {}, self.invokeid)
-        self.sm.interpreter.externalQueue.put(CancelEvent())
-    
-    
-
-        
-class InvokeHTTP(BaseFetchingInvoke):
-    def __init__(self):
-        BaseFetchingInvoke.__init__(self)
-        
-    def send(self, eventobj):
-        self.getter.get_async(self.content, eventobj.data, type=eventobj.name.join("."))
     
     def start(self, parentQueue):
+        from .pyscxml import StateMachine
+        self.sm = StateMachine(self.content)
+        self.send = self.sm.send
+        self.sm.start_threaded(parentQueue, self.invokeid)
         dispatcher.send("init.invoke." + self.invokeid, self)
         
-    def onHttpResult(self, signal, result, **named):
-        self.logger.debug("onHttpResult " + str(named))
-        dispatcher.send("result.invoke.%s" % (self.invokeid), self, data={"response" : result})
+    def cancel(self):
+        self.sm.send(["cancel", "invoke", self.invokeid], {}, self.invokeid)
+    
 
 class InvokeSOAP(BaseInvoke):
     
@@ -161,15 +94,46 @@ class InvokeSOAP(BaseInvoke):
         exec_async(self.init)
     
     def init(self):
-        from suds.client import Client #@UnresolvedImport
+        from suds.client import Client
         self.client = Client(self.content)
         dispatcher.send("init.invoke." + self.invokeid, self)
         
-    def send(self, eventobj):
-        exec_async(partial(self.soap_send_sync, ".".join(eventobj.name), eventobj.data))
+    def send(self, name, data={}, invokeid = None, toQueue = None):
+        exec_async(partial(self.soap_send_sync, ".".join(name), data))
         
     def soap_send_sync(self, method, data):
         result = getattr(self.client.service, method)(**data)
+        
         dispatcher.send("result.invoke.%s.%s" % (self.invokeid, method), self, data=result)
+    
+class InvokePySCXMLServer(BaseInvoke):
+    
+    def __init__(self):
+        BaseInvoke.__init__(self)
+        self.logger = logging.getLogger("pyscxml.invoke.InvokePySCXMLServer")
+        self.getter = UrlGetter()
+        
+        dispatcher.connect(self.onHttpResult, UrlGetter.HTTP_RESULT, self.getter)
+        dispatcher.connect(self.onHttpError, UrlGetter.HTTP_ERROR, self.getter)
+        dispatcher.connect(self.onURLError, UrlGetter.URL_ERROR, self.getter)
+        
+        
+    def send(self, messageXML):
+        self.getter.get_async(self.content, {"_content" : messageXML})
+    
+    def start(self, parentQueue):
+        dispatcher.send("init.invoke." + self.invokeid, self)
+    
+    def onHttpError(self, signal, error_code, source, **named ):
+        self.logger.error("A code %s HTTP error has ocurred when trying to send to target %s" % (error_code, source))
+        dispatcher.send("error.communication.invoke." + self.invokeid, self, data={"error_code" : error_code})
 
-__all__ = ["InvokeWrapper", "InvokeSCXML", "InvokeSOAP", "InvokeHTTP"]
+    def onURLError(self, signal, sender):
+        self.logger.error("The address %s is currently unavailable" % sender.url)
+        dispatcher.send("error.communication.invoke." + self.invokeid, self)
+        
+    def onHttpResult(self, signal, result, **named):
+        self.logger.info("onHttpResult " + str(named))
+        dispatcher.send("result.invoke.%s" % (self.invokeid), self, data={"response" : result})
+    
+        

@@ -4,60 +4,10 @@ Created on Jan 4, 2010
 @author: johan
 '''
 
-#from xml.etree import ElementTree as etree
-from lxml import etree
-from copy import deepcopy
-from functools import reduce
-
-
-class Nodeset(list):
-    def toXML(self):
-        def f(x, y):
-            return str(x) + "\n" +  str(y)
-        return reduce(f, self, "")
-        
-            
-        
-class XpathElement(etree.ElementBase):
-        
-    def xpath(self, _path, namespaces=None, extensions=None, smart_strings=True, **_variables):
-        result = etree.ElementBase.xpath(self, _path, namespaces=namespaces, extensions=extensions, smart_strings=smart_strings, **_variables)
-        if type(result) is list:
-            return Nodeset(result)
-        else: return result
+#from _abcoll import MutableMapping
+#from itertools import imap as _imap
+#from operator import eq as _eq
     
-    def append(self, node):
-        if node is None: return
-        if etree.iselement(node): 
-            etree.ElementBase.append(self, node)
-            return
-        nodelist = [node] if not isinstance(node, list) else node
-        
-        for child in nodelist:
-            try:
-                etree.ElementBase.append(self, deepcopy(child))
-            except TypeError:
-                child = "" if child is None else child
-                if len(self):
-                    if self[-1].tail is None: 
-                        self[-1].tail = str(child)
-                    else:
-                        self[-1].tail += "\n%s" % str(child)
-                else:
-                    if not self.text: 
-                        self.text = str(child)
-                    else:
-                        self.text += "\n%s" % str(child)
-                    
-    def __str__(self):
-        return etree.tostring(self)
-        
-
-
-
-xpathparser = etree.XMLParser()
-xpathparser.set_element_class_lookup(etree.ElementDefaultClassLookup(element=XpathElement))
-
 class OrderedSet(list):
     def delete(self, elem):
         try:
@@ -78,61 +28,157 @@ class OrderedSet(list):
     def clear(self):
         self.__init__()
     
-def dictToXML(dictionary, root="root", root_attrib={}):
-    '''takes a python dictionary and returns an xml representation as an lxml Element.'''
-    parser = xpathparser
-    def parse(d, parent):
-        if not isinstance(d, dict):
-            parent.append(deepcopy(d))
-            return
-        
-        for k, v in list(d.items()):
-            if isinstance(k, str):
-                new = parser.makeelement(k)
-            else:
-                new = deepcopy(k)
-            parent.append(new)
-            
-            
-            if isinstance(v, list):
-                for item in v:
-                    parse(item, new)
-            elif isinstance(v, dict):
-                parse(v, new)
-            else:
-                v = v if v is not None else ""
-                new.text = str(v)
     
-    
-    root = parser.makeelement(root, attrib=root_attrib)
-    parse(dictionary, root)
-    return root
 
-if __name__ == '__main__':
-    import sys
-    from .eventprocessor import Event
     
-    
-#    d = {
-#         "apa" : {"bepa" : 123, "cepa" : 34},
-#          "foo" : {"inner" : etree.fromstring("<elem/>")}
-#         }
-    p = etree.Element("parent")
-    d = {
-         p : "123",
-         "lol" : 3
-         }
-    
-    xpathData = etree.fromstring('''
-    <books xmlns="">
-          <book title="title1"/>
-          <book title="title2"/>
-        </books>
-        ''', parser=xpathparser).xpath(".")
-    print(xpathData, Event("hello", data=xpathData).__dict__)
-    print(etree.tostring( dictToXML(Event("hello", data=xpathData).__dict__, root="data", root_attrib={"id" : "key"}), pretty_print=True))
-    sys.exit()
-#    e = Event("hello", data={"d1" : etree.fromstring("<elem/>")})
-    e = Event("hello", data={"d1" : 123})
-#    print e.__dict__
-    print(etree.tostring( dictToXML({"p1" : "val"}, root="data", root_attrib={"id" : "key"}), pretty_print=True))
+################################################################################
+### OrderedDict, from python 2.7 standard library
+################################################################################
+
+#class OrderedDict(dict, MutableMapping):
+#    'Dictionary that remembers insertion order'
+#    # An inherited dict maps keys to values.
+#    # The inherited dict provides __getitem__, __len__, __contains__, and get.
+#    # The remaining methods are order-aware.
+#    # Big-O running times for all methods are the same as for regular dictionaries.
+#
+#    # The internal self.__map dictionary maps keys to links in a doubly linked list.
+#    # The circular doubly linked list starts and ends with a sentinel element.
+#    # The sentinel element never gets deleted (this simplifies the algorithm).
+#    # Each link is stored as a list of length three:  [PREV, NEXT, KEY].
+#
+#    def __init__(self, *args, **kwds):
+#        '''Initialize an ordered dictionary.  Signature is the same as for
+#        regular dictionaries, but keyword arguments are not recommended
+#        because their insertion order is arbitrary.
+#
+#        '''
+#        if len(args) > 1:
+#            raise TypeError('expected at most 1 arguments, got %d' % len(args))
+#        try:
+#            self.__root
+#        except AttributeError:
+#            self.__root = root = [None, None, None]     # sentinel node
+#            PREV = 0
+#            NEXT = 1
+#            root[PREV] = root[NEXT] = root
+#            self.__map = {}
+#        self.update(*args, **kwds)
+#
+#    def __setitem__(self, key, value, PREV=0, NEXT=1, dict_setitem=dict.__setitem__):
+#        'od.__setitem__(i, y) <==> od[i]=y'
+#        # Setting a new item creates a new link which goes at the end of the linked
+#        # list, and the inherited dictionary is updated with the new key/value pair.
+#        if key not in self:
+#            root = self.__root
+#            last = root[PREV]
+#            last[NEXT] = root[PREV] = self.__map[key] = [last, root, key]
+#        dict_setitem(self, key, value)
+#
+#    def __delitem__(self, key, PREV=0, NEXT=1, dict_delitem=dict.__delitem__):
+#        'od.__delitem__(y) <==> del od[y]'
+#        # Deleting an existing item uses self.__map to find the link which is
+#        # then removed by updating the links in the predecessor and successor nodes.
+#        dict_delitem(self, key)
+#        link = self.__map.pop(key)
+#        link_prev = link[PREV]
+#        link_next = link[NEXT]
+#        link_prev[NEXT] = link_next
+#        link_next[PREV] = link_prev
+#
+#    def __iter__(self, NEXT=1, KEY=2):
+#        'od.__iter__() <==> iter(od)'
+#        # Traverse the linked list in order.
+#        root = self.__root
+#        curr = root[NEXT]
+#        while curr is not root:
+#            yield curr[KEY]
+#            curr = curr[NEXT]
+#
+#    def __reversed__(self, PREV=0, KEY=2):
+#        'od.__reversed__() <==> reversed(od)'
+#        # Traverse the linked list in reverse order.
+#        root = self.__root
+#        curr = root[PREV]
+#        while curr is not root:
+#            yield curr[KEY]
+#            curr = curr[PREV]
+#
+#    def __reduce__(self):
+#        'Return state information for pickling'
+#        items = [[k, self[k]] for k in self]
+#        tmp = self.__map, self.__root
+#        del self.__map, self.__root
+#        inst_dict = vars(self).copy()
+#        self.__map, self.__root = tmp
+#        if inst_dict:
+#            return (self.__class__, (items,), inst_dict)
+#        return self.__class__, (items,)
+#
+#    def clear(self):
+#        'od.clear() -> None.  Remove all items from od.'
+#        try:
+#            for node in self.__map.itervalues():
+#                del node[:]
+#            self.__root[:] = [self.__root, self.__root, None]
+#            self.__map.clear()
+#        except AttributeError:
+#            pass
+#        dict.clear(self)
+#
+#    setdefault = MutableMapping.setdefault
+#    update = MutableMapping.update
+#    pop = MutableMapping.pop
+#    keys = MutableMapping.keys
+#    values = MutableMapping.values
+#    items = MutableMapping.items
+#    iterkeys = MutableMapping.iterkeys
+#    itervalues = MutableMapping.itervalues
+#    iteritems = MutableMapping.iteritems
+#    __ne__ = MutableMapping.__ne__
+#
+#    def popitem(self, last=True):
+#        '''od.popitem() -> (k, v), return and remove a (key, value) pair.
+#        Pairs are returned in LIFO order if last is true or FIFO order if false.
+#
+#        '''
+#        if not self:
+#            raise KeyError('dictionary is empty')
+#        key = next(reversed(self) if last else iter(self))
+#        value = self.pop(key)
+#        return key, value
+#
+#    def __repr__(self):
+#        'od.__repr__() <==> repr(od)'
+#        if not self:
+#            return '%s()' % (self.__class__.__name__,)
+#        return '%s(%r)' % (self.__class__.__name__, self.items())
+#
+#    def copy(self):
+#        'od.copy() -> a shallow copy of od'
+#        return self.__class__(self)
+#
+#    @classmethod
+#    def fromkeys(cls, iterable, value=None):
+#        '''OD.fromkeys(S[, v]) -> New ordered dictionary with keys from S
+#        and values equal to v (which defaults to None).
+#
+#        '''
+#        d = cls()
+#        for key in iterable:
+#            d[key] = value
+#        return d
+#
+#    def __eq__(self, other):
+#        '''od.__eq__(y) <==> od==y.  Comparison to another OD is order-sensitive
+#        while comparison to a regular mapping is order-insensitive.
+#
+#        '''
+#        if isinstance(other, OrderedDict):
+#            return len(self)==len(other) and \
+#                   all(_imap(_eq, self.iteritems(), other.iteritems()))
+#        return dict.__eq__(self, other)
+#
+#    def __del__(self):
+#        self.clear()                # eliminate cyclical references
+#        

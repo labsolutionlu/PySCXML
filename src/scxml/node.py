@@ -33,10 +33,9 @@ class SCXMLNode(object):
         self.parent = parent
         self.n = n
         self.initial = []
-        self.isFirstEntry = True
-        self.initDatamodel = lambda:None
         
     def addChild(self, child):
+#        assert type(child) == State
         self.state.append(child)
         
     def addHistory(self, child):
@@ -58,7 +57,7 @@ class SCXMLNode(object):
         self.onexit.append(exit)
         
     def getChildren(self):
-        return self.state + self.final 
+        return self.transition +self.state + self.history + self.final 
     
     def __repr__(self):
         return str(self)
@@ -120,7 +119,6 @@ class Transition(Executable):
         self.target = []
         self.event = []
         self.cond = None
-        self.type = "external"
         
     def __str__(self):
         attrs = 'source="%s" ' % self.source.id
@@ -156,8 +154,8 @@ class SCXMLDocument(object):
         self.initial = None
         self.stateDict = {}
         self._rootState = None
+        self.datamodel = {}
         self.name = ""
-        self.binding = None
     
     def setRoot(self, state):
         self._rootState = state
@@ -196,5 +194,5 @@ class SCXMLDocument(object):
         return iter(self.rootState)
     
     
-__all__ = ['Final', 'History', 'Initial', 'Onentry', 'Onexit', 'Parallel', 'SCXMLDocument', 'State', 'Transition', "SCXMLNode"]
-
+            
+    
